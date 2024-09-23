@@ -1,11 +1,10 @@
 $ErrorActionPreference = "SilentlyContinue"
 
+# Funzione per ottenere la firma del file
 function Get-Signature {
-    [CmdletBinding()]
     param (
         [string[]]$FilePath
     )
-
     $Existence = Test-Path -PathType "Leaf" -Path $FilePath
     $Authenticode = (Get-AuthenticodeSignature -FilePath $FilePath -ErrorAction SilentlyContinue).Status
     $Signature = "Invalid Signature (UnknownError)"
@@ -28,80 +27,71 @@ function Get-Signature {
         }
         return $Signature
     } else {
-        $Signature = "File Was Not Found"
-        return $Signature
+        return "File Was Not Found"
+    }
+}
+
+# Funzione per determinare su quale disco si trova il file
+function Get-DriveInfo {
+    param (
+        [string]$FilePath
+    )
+    return $FilePath.Split(":")[0]
+}
+
+# Funzione per controllare se il file è stato eliminato o spostato nel cestino
+function Check-FileDeletion {
+    param (
+        [string]$FilePath
+    )
+    if (Test-Path -Path $FilePath) {
+        return "File Exists"
+    }
+    
+    $recycleBinPath = "$env:SystemDrive\$Recycle.Bin"
+    $recycleItems = Get-ChildItem -Recurse -Force $recycleBinPath | Where-Object { $_.PSIsContainer -eq $false } | Select-Object FullName
+    $foundInRecycle = $recycleItems | Where-Object { $_.FullName -like "*$FilePath*" }
+
+    if ($foundInRecycle) {
+        return "File Moved to Recycle Bin"
+    } else {
+        return "File Deleted Permanently (Shift+Del or Cleared from Recycle Bin)"
     }
 }
 
 # Funzione per controllare se l'estensione del file è cambiata
 function Check-FileExtensionChange {
     param (
-        [string]$FilePath
+        [string]$FilePath,
+        [string]$OriginalExtension
     )
-
-    if (-not (Test-Path -Path $FilePath)) {
-        return "File Was Not Found"
+    if (Test-Path -Path $FilePath) {
+        $currentExtension = [System.IO.Path]::GetExtension($FilePath)
+        if ($currentExtension -ne $OriginalExtension) {
+            return "File Extension Changed: $currentExtension"
+        } else {
+            return "File Extension Not Changed"
+        }
     }
-
-    # Ottieni l'estensione attuale del file
-    $CurrentExtension = [System.IO.Path]::GetExtension($FilePath)
-
-    # Ottieni il MIME type del file
-    Add-Type -AssemblyName System.Web
-    $MimeType = [System.Web.MimeMapping]::GetMimeMapping($FilePath)
-
-    # Prevedi l'estensione da MIME type
-    $ExpectedExtension = ""
-    switch ($MimeType) {
-        "image/jpeg" { $ExpectedExtension = ".jpg" }
-        "image/png" { $ExpectedExtension = ".png" }
-        "application/pdf" { $ExpectedExtension = ".pdf" }
-        "text/plain" { $ExpectedExtension = ".txt" }
-        "application/zip" { $ExpectedExtension = ".zip" }
-        # Aggiungi altri tipi MIME se necessario
-        default { $ExpectedExtension = "" }
-    }
-
-    if ($ExpectedExtension -and ($CurrentExtension -ne $ExpectedExtension)) {
-        return "File extension changed (Expected: $ExpectedExtension, Actual: $CurrentExtension)"
-    } elseif (-not $ExpectedExtension) {
-        return "Could not determine expected extension for MIME type: $MimeType"
-    } else {
-        return "File extension is correct"
-    }
+    return "File Not Found"
 }
 
 Clear-Host
 
-Write-Host ""
-Write-Host ""
-Write-Host -ForegroundColor Red "   ██████╗░██╗░░░██╗███╗░░░███╗██████╗░";
-Write-Host -ForegroundColor Red "   ██╔══██╗██║░░░██║████╗░████║██╔══██╗";
-Write-Host -ForegroundColor Red "   ██║░░██║██║░░░██║██╔████╔██║██████╦╝";
-Write-Host -ForegroundColor Red "   ██║░░██║██║░░░██║██║╚██╔╝██║██╔══██╗";
-Write-Host -ForegroundColor Red "   ██████╔╝╚██████╔╝██║░╚═╝░██║██████╦╝";
-Write-Host -ForegroundColor Red "   ╚═════╝░░╚═════╝░╚═╝░░░░░╚═╝╚═════╝░";
+# Interfaccia grafica di avvio
+Write-Host "" -ForegroundColor Red
+Write-Host "   ██████╗░██╗░░░██╗███╗░░░███╗██████╗░" -ForegroundColor Red
+Write-Host "   ██╔══██╗██║░░░██║████╗░████║██╔══██╗" -ForegroundColor Red
+Write-Host "   ██║░░██║██║░░░██║██╔████╔██║██████╦╝" -ForegroundColor Red
+Write-Host "   ██║░░██║██║░░░██║██║╚██╔╝██║██╔══██╗" -ForegroundColor Red
+Write-Host "   ██████╔╝╚██████╔╝██║░╚═╝░██║██████╦╝" -ForegroundColor Red
+Write-Host "   ╚═════╝░░╚═════╝░╚═╝░░░░░╚═╝╚═════╝░" -ForegroundColor Red
 
-Write-Host ""
-Write-Host -ForegroundColor Red "   ░██████╗░██████╗";
-Write-Host -ForegroundColor Red "   ██╔════╝██╔════╝";
-Write-Host -ForegroundColor Red "   ╚█████╗░╚█████╗░";
-Write-Host -ForegroundColor Red "   ░╚═══██╗░╚═══██╗";
-Write-Host -ForegroundColor Red "   ██████╔╝██████╔╝";
-Write-Host -ForegroundColor Red "   ╚═════╝░╚═════╝░";
-
-Write-Host ""
-Write-Host -ForegroundColor Red "   ██████╗░░█████╗░███╗░░░███╗";
-Write-Host -ForegroundColor Red "   ██╔══██╗██╔══██╗████╗░████║";
-Write-Host -ForegroundColor Red "   ██████╦╝███████║██╔████╔██║";
-Write-Host -ForegroundColor Red "   ██╔══██╗██╔══██║██║╚██╔╝██║";
-Write-Host -ForegroundColor Red "   ██████╦╝██║░░██║██║░╚═╝░██║";
-Write-Host -ForegroundColor Red "   ╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝";
-
-Write-Host ""
-Write-Host -ForegroundColor Blue "   Made by Srdomy"
+Write-Host "" -ForegroundColor Blue
+Write-Host "   Made by Srdomy" -ForegroundColor Blue
 Write-Host ""
 
+# Funzione per controllare se si dispone dei privilegi di amministratore
 function Test-Admin {
     $currentUser = New-Object Security.Principal.WindowsPrincipal $([Security.Principal.WindowsIdentity]::GetCurrent())
     $currentUser.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
@@ -117,21 +107,21 @@ $sw = [Diagnostics.Stopwatch]::StartNew()
 if (!(Get-PSDrive -Name HKLM -PSProvider Registry)) {
     Try {
         New-PSDrive -Name HKLM -PSProvider Registry -Root HKEY_LOCAL_MACHINE
-    }
-    Catch {
+    } Catch {
         Write-Warning "Error Mounting HKEY_Local_Machine"
     }
 }
+
 $bv = ("bam", "bam\State")
 Try {
     $Users = foreach($ii in $bv) {
         Get-ChildItem -Path "HKLM:\SYSTEM\CurrentControlSet\Services\$($ii)\UserSettings\" | Select-Object -ExpandProperty PSChildName
     }
-}
-Catch {
+} Catch {
     Write-Warning "Error Parsing BAM Key. Likely unsupported Windows Version"
     Exit
 }
+
 $rpath = @("HKLM:\SYSTEM\CurrentControlSet\Services\bam\","HKLM:\SYSTEM\CurrentControlSet\Services\bam\state\")
 
 $UserTime = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation").TimeZoneKeyName
@@ -149,8 +139,7 @@ $Bam = Foreach ($Sid in $Users) {
             $objSID = New-Object System.Security.Principal.SecurityIdentifier($Sid)
             $User = $objSID.Translate([System.Security.Principal.NTAccount]) 
             $User = $User.Value
-        }
-        Catch {
+        } Catch {
             $User = ""
         }
         $i = 0
@@ -162,22 +151,48 @@ $Bam = Foreach ($Sid in $Users) {
                 $Hex = [System.BitConverter]::ToString($key[7..0]) -replace "-",""
                 $TimeLocal = Get-Date ([DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
                 $TimeUTC = Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
-                $Exe = $Key[24..($Key.length-1)] -replace "\x00",""
-                $exe_name = [System.IO.Path]::GetFileName($exe)
+                $Bias = -([convert]::ToInt32([Convert]::ToString($UserBias,2),2))
+                $Day = -([convert]::ToInt32([Convert]::ToString($UserDay,2),2)) 
+                $Biasd = $Bias / 60
+                $Dayd = $Day / 60
+                $TimeUser = (Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))).addminutes($Bias) -Format "yyyy-MM-dd HH:mm:ss") 
                 
-                # Verifica se l'estensione è cambiata
-                $extensionCheck = Check-FileExtensionChange $Exe
+                # File path e controllo
+                $d = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { ((split-path -path $item).Remove(23)).trimstart("\Device\HarddiskVolume") } else { $d = "" }
+                $f = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Split-path -leaf ($item).TrimStart() } else { $item } 
+                $cp = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { ($item).Remove(1,23) } else { $cp = "" }
+                $path = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Join-Path -Path "C:" -ChildPath $cp } else { $path = "" } 
+                
+                # Verifica Firma e stato file
+                $sig = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Get-Signature -FilePath $path } else { $sig = "" }
+                $driveInfo = if ($path) { Get-DriveInfo -FilePath $path } else { "N/A" }
+                $deletionStatus = if ($path) { Check-FileDeletion -FilePath $path } else { "N/A" }
+                $originalExtension = [System.IO.Path]::GetExtension($item)  # Estensione originale
 
-                Write-Host -ForegroundColor White "$exe_name   $($TimeUTC) UTC - $TimeLocal Local ($User)"
-                Write-Host -ForegroundColor Yellow "Signature Check: $(Get-Signature -FilePath $Exe)"
-                Write-Host -ForegroundColor Yellow "Extension Check: $extensionCheck"
+                $extensionStatus = if ($path) { Check-FileExtensionChange -FilePath $path -OriginalExtension $originalExtension } else { "N/A" }
+
+                [PSCustomObject]@{
+                    'Examiner Time' = $TimeLocal
+                    'Last Execution Time (UTC)' = $TimeUTC
+                    'Last Execution User Time' = $TimeUser
+                    Application = $f
+                    Path = $path
+                    Signature = $Sig
+                    Drive = $driveInfo
+                    'Deletion Status' = $deletionStatus
+                    'Extension Status' = $extensionStatus
+                    User = $User
+                    SID = $Sid
+                    Regpath = $rp
+                }
             }
         }
     }
 }
 
-$sw.Stop()
+$Bam | Out-GridView -PassThru -Title "BAM key entries $($Bam.count)  - User TimeZone: ($UserTime) -> ActiveBias: ($Bias) - DayLightTime: ($Day)"
+
+$sw.stop()
+$t = $sw.Elapsed.TotalMinutes
 Write-Host ""
-Write-Host -ForegroundColor Red "Script took: $($sw.Elapsed.TotalSeconds) seconds"
-Write-Host ""
-Start-Sleep 10
+Write-Host "Elapsed Time $t Minutes" -ForegroundColor Yellow
