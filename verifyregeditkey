@@ -1,0 +1,50 @@
+$ErrorActionPreference = "SilentlyContinue"
+
+# Funzione per ottenere le chiavi BAM
+function Get-BAMKeys {
+    $bamKeys = @()
+
+    # Percorsi del registro da controllare
+    $bamPaths = @(
+        "HKLM:\SYSTEM\CurrentControlSet\Services\bam\UserSettings",
+        "HKLM:\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings"
+    )
+
+    # Loop attraverso i percorsi per estrarre le chiavi
+    foreach ($bamPath in $bamPaths) {
+        try {
+            # Controlla se il percorso esiste prima di procedere
+            if (Test-Path $bamPath) {
+                $bamUsers = Get-ChildItem -Path $bamPath | Select-Object -ExpandProperty PSChildName
+                
+                foreach ($user in $bamUsers) {
+                    $userPath = "$bamPath\$user"
+                    $bamItems = Get-Item -Path $userPath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Property
+                    foreach ($item in $bamItems) {
+                        $bamValue = Get-ItemProperty -Path $userPath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty $item
+                        $bamKeys += [PSCustomObject]@{
+                            UserSID = $user
+                            BAMKey  = $item
+                            Value   = $bamValue
+                        }
+                    }
+                }
+            } else {
+                Write-Warning "Path $bamPath not found."
+            }
+        }
+        catch {
+            Write-Warning "Error extracting BAM keys from $bamPath."
+        }
+    }
+
+    return $bamKeys
+}
+
+# Esegui il recupero delle chiavi BAM
+$bamResults = Get-BAMKeys
+
+# Visualizza i risultati
+foreach ($result in $bamResults) {
+    Write-Host "User: $($result.UserSID) | BAM Key: $($result.BAMKey) | Value: $($result.Value)"
+}
