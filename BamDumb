@@ -158,19 +158,15 @@ $Bam = Foreach ($Sid in $Users) {
             if ($key.length -eq 24) {
                 $Hex = [System.BitConverter]::ToString($key[7..0]) -replace "-",""
                 $TimeLocal = Get-Date ([DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
-                $TimeUTC = Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
-                $Bias = -([convert]::ToInt32([Convert]::ToString($UserBias,2),2))
-                $Day = -([convert]::ToInt32([Convert]::ToString($UserDay,2),2)) 
-                $Biasd = $Bias / 60
-                $Dayd = $Day / 60
-                $TImeUser = (Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))).addminutes($Bias) -Format "yyyy-MM-dd HH:mm:ss") 
-                
-                # File path e controllo
-                $d = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { ((split-path -path $item).Remove(23)).trimstart("\Device\HarddiskVolume") } else { $d = "" }
-                $f = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Get-Signature "$((split-path -path $item).Remove(23)).trimstart("\Device\HarddiskVolume")" } else { $f = "" }
+                $TimeUTC = (Get-Date ([DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss").ToUniversalTime()
+                $TimeUser = [DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16)).AddMinutes($UserBias)
+                $BiasD = [DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16)).AddMinutes($UserDay)
+                $d = Get-DriveInfo "$Item"
+                if ($item -match '\d{1}') { Get-Signature "$((split-path -path $item).Remove(23)).trimstart("\Device\HarddiskVolume")" } else { $f = "" }
 
                 Write-Output "$i|$User|$Item|Last Run Time (Local) $TimeLocal|Last Run Time (UTC) $TimeUTC|Last Run Time (User) $TimeUser UTC+$BiasD Daylight+ $Dayd |Path $d |FileStatus $f"
             }
         }
     }
 }
+
