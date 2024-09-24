@@ -97,6 +97,8 @@ if (!(Test-Admin)) {
     Exit
 }
 
+Write-Host "Checking for registry access..." -ForegroundColor Yellow
+
 $sw = [Diagnostics.Stopwatch]::StartNew()
 
 if (!(Get-PSDrive -Name HKLM -PSProvider Registry)) {
@@ -104,8 +106,11 @@ if (!(Get-PSDrive -Name HKLM -PSProvider Registry)) {
         New-PSDrive -Name HKLM -PSProvider Registry -Root HKEY_LOCAL_MACHINE
     } Catch {
         Write-Warning "Error Mounting HKEY_Local_Machine"
+        Exit
     }
 }
+
+Write-Host "Registry access verified." -ForegroundColor Green
 
 $bv = ("bam", "bam\State")
 Try {
@@ -116,6 +121,8 @@ Try {
     Write-Warning "Error Parsing BAM Key. Likely unsupported Windows Version"
     Exit
 }
+
+Write-Host "BAM users retrieved: $($Users.Count)" -ForegroundColor Green
 
 $rpath = @("HKLM:\SYSTEM\CurrentControlSet\Services\bam\","HKLM:\SYSTEM\CurrentControlSet\Services\bam\state\")
 
@@ -152,18 +159,19 @@ $Bam = Foreach ($Sid in $Users) {
                 $d = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { ((split-path -path $item).Remove(23)).trimstart("\Device\HarddiskVolume") } else { $d = "" }
                 $f = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Split-path -leaf ($item).TrimStart() } else { $item } 
                 $cp = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { ($item).Remove(1,23) } else { $cp = "" }
-                $path = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Join-Path -Path "C:" -ChildPath $cp } else { $path = "" } 
-                
-                # Verifica Firma e stato file
-                $sig = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Get-Signature -FilePath $path } else { $sig = "" }
-                $driveInfo = if ($path) { Get-DriveInfo -FilePath $path } else { "N/A" }
-                $deletionStatus = if ($path) { Check-FileDeletion -FilePath $path } else { "N/A" }
+                $path = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Join-Path -Path "C:" -ChildPath $cp } else { $item } 
 
+                $driveInfo = Get-DriveInfo -FilePath $path
+                $Sig = Get-Signature -FilePath $path
+                $deletionStatus = Check-FileDeletion -FilePath $path
+
+                # Creazione oggetto BAM
                 [PSCustomObject]@{
-                    'Examiner Time' = $TimeLocal
-                    'Last Execution Time (UTC)' = $TimeUTC
-                    'Last Execution User Time' = $TimeUser
-                    Application = $f
+                    'Time UTC' = $TimeUTC
+                    'Time Local' = $TimeLocal
+                    'User Time' = $TimeUser
+                    'Bias' = $Biasd
+                    'Daylight Bias' = $Dayd
                     Path = $path
                     Signature = $Sig
                     Drive = $driveInfo.Drive
@@ -178,7 +186,7 @@ $Bam = Foreach ($Sid in $Users) {
     }
 }
 
-$Bam | Out-GridView -PassThru -Title "BAM key entries $($Bam.count)  - User TimeZone: ($UserTime) -> ActiveBias: ($Bias) - DayLightTime: ($Day)"
+$Bam | Out-GridView -PassThru -Title "BAM key entries $($Bam.count) - User TimeZone: ($UserTime) -> ActiveBias: ($Bias) - DayLightTime: ($Day)"
 
 $sw.stop()
 $t = $sw.Elapsed.TotalMinutes
