@@ -10,20 +10,12 @@ function Get-Signature {
     $Signature = "Invalid Signature (UnknownError)"
 
     if ($Existence) {
-        if ($Authenticode -eq "Valid") {
-            $Signature = "Valid Signature"
-        }
-        elseif ($Authenticode -eq "NotSigned") {
-            $Signature = "Invalid Signature (NotSigned)"
-        }
-        elseif ($Authenticode -eq "HashMismatch") {
-            $Signature = "Invalid Signature (HashMismatch)"
-        }
-        elseif ($Authenticode -eq "NotTrusted") {
-            $Signature = "Invalid Signature (NotTrusted)"
-        }
-        elseif ($Authenticode -eq "UnknownError") {
-            $Signature = "Invalid Signature (UnknownError)"
+        switch ($Authenticode) {
+            "Valid" { $Signature = "Valid Signature" }
+            "NotSigned" { $Signature = "Invalid Signature (NotSigned)" }
+            "HashMismatch" { $Signature = "Invalid Signature (HashMismatch)" }
+            "NotTrusted" { $Signature = "Invalid Signature (NotTrusted)" }
+            "UnknownError" { $Signature = "Invalid Signature (UnknownError)" }
         }
         return $Signature
     } else {
@@ -38,16 +30,9 @@ function Get-DriveInfo {
     )
     $driveLetter = $FilePath.Split(":")[0]
     $drive = Get-PSDrive -Name $driveLetter
-    if ($drive) {
-        return @{
-            Drive = $driveLetter
-            FileSystem = $drive.Provider.Name
-        }
-    } else {
-        return @{
-            Drive = $driveLetter
-            FileSystem = "Unknown"
-        }
+    return @{
+        Drive = $driveLetter
+        FileSystem = $drive.Provider.Name
     }
 }
 
@@ -59,7 +44,7 @@ function Check-FileDeletion {
     if (Test-Path -Path $FilePath) {
         return "File Exists"
     }
-    
+
     $recycleBinPath = "$env:SystemDrive\$Recycle.Bin"
     $recycleItems = Get-ChildItem -Recurse -Force $recycleBinPath | Where-Object { $_.PSIsContainer -eq $false } | Select-Object FullName
     $foundInRecycle = $recycleItems | Where-Object { $_.FullName -like "*$FilePath*" }
@@ -83,13 +68,18 @@ Write-Host "   ██████╔╝███████╗█████�
 Write-Host "   ╚═════╝░╚══════╝╚══════╝╚═╝░░░░░" -ForegroundColor Red
 
 Write-Host "" -ForegroundColor Blue
-Write-Host "   Made by Srdomy" -ForegroundColor Blue
+Write-Host "██████╗░░█████╗░███╗░░░███╗" -ForegroundColor Blue
+Write-Host "██╔══██╗██╔══██╗████╗░████║" -ForegroundColor Blue
+Write-Host "██████╦╝███████║██╔████╔██║" -ForegroundColor Blue
+Write-Host "██╔══██╗██╔══██║██║╚██╔╝██║" -ForegroundColor Blue
+Write-Host "██████╦╝██║░░██║██║░╚═╝░██║" -ForegroundColor Blue
+Write-Host "╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝" -ForegroundColor Blue
 Write-Host ""
 
 # Funzione per controllare se si dispone dei privilegi di amministratore
 function Test-Admin {
     $currentUser = New-Object Security.Principal.WindowsPrincipal $([Security.Principal.WindowsIdentity]::GetCurrent())
-    $currentUser.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+    return $currentUser.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
 }
 if (!(Test-Admin)) {
     Write-Warning "Please Run This Script as Admin."
@@ -98,8 +88,6 @@ if (!(Test-Admin)) {
 }
 
 Write-Host "Checking for registry access..." -ForegroundColor Yellow
-
-$sw = [Diagnostics.Stopwatch]::StartNew()
 
 if (!(Get-PSDrive -Name HKLM -PSProvider Registry)) {
     Try {
@@ -112,6 +100,7 @@ if (!(Get-PSDrive -Name HKLM -PSProvider Registry)) {
 
 Write-Host "Registry access verified." -ForegroundColor Green
 
+# Get BAM users
 $bv = ("bam", "bam\State")
 Try {
     $Users = foreach($ii in $bv) {
@@ -126,11 +115,13 @@ Write-Host "BAM users retrieved: $($Users.Count)" -ForegroundColor Green
 
 $rpath = @("HKLM:\SYSTEM\CurrentControlSet\Services\bam\","HKLM:\SYSTEM\CurrentControlSet\Services\bam\state\")
 
+# Getting TimeZone Information
 $UserTime = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation").TimeZoneKeyName
 $UserBias = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation").ActiveTimeBias
 $UserDay = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation").DaylightBias
 
-$Bam = Foreach ($Sid in $Users) {
+# Fetch BAM items
+$Bam = foreach ($Sid in $Users) {
     foreach($rp in $rpath) {
         $BamItems = Get-Item -Path "$($rp)UserSettings\$Sid" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Property
         
@@ -142,7 +133,7 @@ $Bam = Foreach ($Sid in $Users) {
             $User = ""
         }
         
-        ForEach ($Item in $BamItems) {
+        foreach ($Item in $BamItems) {
             $Key = Get-ItemProperty -Path "$($rp)UserSettings\$Sid" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty $Item
 
             if ($key.length -eq 24) {
@@ -188,7 +179,6 @@ $Bam = Foreach ($Sid in $Users) {
 
 $Bam | Out-GridView -PassThru -Title "BAM key entries $($Bam.count) - User TimeZone: ($UserTime) -> ActiveBias: ($Bias) - DayLightTime: ($Day)"
 
-$sw.stop()
-$t = $sw.Elapsed.TotalMinutes
 Write-Host ""
-Write-Host "Elapsed Time $t Minutes" -ForegroundColor Yellow
+$t = (Get-Date) - $start
+Write-Host "Elapsed Time $([math]::round($t.TotalMinutes, 2)) Minutes" -ForegroundColor Yellow
