@@ -1,33 +1,15 @@
 $ErrorActionPreference = "SilentlyContinue"
 
-# Funzione per ottenere la firma del file
-function Get-Signature {
+# Funzione per ottenere il file system del disco
+function Get-DriveFileSystem {
     param (
-        [string[]]$FilePath
+        [string]$DriveLetter
     )
-    $Existence = Test-Path -PathType "Leaf" -Path $FilePath
-    $Authenticode = (Get-AuthenticodeSignature -FilePath $FilePath -ErrorAction SilentlyContinue).Status
-    $Signature = "Invalid Signature (UnknownError)"
-
-    if ($Existence) {
-        if ($Authenticode -eq "Valid") {
-            $Signature = "Valid Signature"
-        }
-        elseif ($Authenticode -eq "NotSigned") {
-            $Signature = "Invalid Signature (NotSigned)"
-        }
-        elseif ($Authenticode -eq "HashMismatch") {
-            $Signature = "Invalid Signature (HashMismatch)"
-        }
-        elseif ($Authenticode -eq "NotTrusted") {
-            $Signature = "Invalid Signature (NotTrusted)"
-        }
-        elseif ($Authenticode -eq "UnknownError") {
-            $Signature = "Invalid Signature (UnknownError)"
-        }
-        return $Signature
+    $driveInfo = Get-PSDrive | Where-Object { $_.Name -eq $DriveLetter }
+    if ($driveInfo) {
+        return $driveInfo.FileSystem
     } else {
-        return "File Was Not Found"
+        return "Unknown"
     }
 }
 
@@ -36,59 +18,46 @@ function Get-DriveInfo {
     param (
         [string]$FilePath
     )
-    return $FilePath.Split(":")[0]
+    $driveLetter = $FilePath.Split(":")[0]
+    return $driveLetter
 }
 
-# Funzione per controllare se il file è stato eliminato o spostato nel cestino
-function Check-FileDeletion {
+# Funzione per controllare se la chiave UserSettings esiste
+function Check-UserSettingsKey {
     param (
-        [string]$FilePath
+        [string]$Sid,
+        [string]$rp
     )
-    if (Test-Path -Path $FilePath) {
-        return "File Exists"
-    }
-    
-    $recycleBinPath = "$env:SystemDrive\$Recycle.Bin"
-    $recycleItems = Get-ChildItem -Recurse -Force $recycleBinPath | Where-Object { $_.PSIsContainer -eq $false } | Select-Object FullName
-    $foundInRecycle = $recycleItems | Where-Object { $_.FullName -like "*$FilePath*" }
 
-    if ($foundInRecycle) {
-        return "File Moved to Recycle Bin"
+    $keyPath = "$($rp)UserSettings\$Sid"
+    if (!(Test-Path $keyPath)) {
+        return "L'utente a cui stai facendo il controllo sta cercando di bypassarti perché la Key di regedit UserSettings non esiste."
     } else {
-        return "File Deleted Permanently (Shift+Del or Cleared from Recycle Bin)"
+        return "UserSettings key exists."
     }
-}
-
-# Funzione per controllare se l'estensione del file è cambiata
-function Check-FileExtensionChange {
-    param (
-        [string]$FilePath,
-        [string]$OriginalExtension
-    )
-    if (Test-Path -Path $FilePath) {
-        $currentExtension = [System.IO.Path]::GetExtension($FilePath)
-        if ($currentExtension -ne $OriginalExtension) {
-            return "File Extension Changed: $currentExtension"
-        } else {
-            return "File Extension Not Changed"
-        }
-    }
-    return "File Not Found"
 }
 
 Clear-Host
 
-# Interfaccia grafica di avvio
-Write-Host "" -ForegroundColor Red
-Write-Host "   ██████╗░██╗░░░██╗███╗░░░███╗██████╗░" -ForegroundColor Red
-Write-Host "   ██╔══██╗██║░░░██║████╗░████║██╔══██╗" -ForegroundColor Red
-Write-Host "   ██║░░██║██║░░░██║██╔████╔██║██████╦╝" -ForegroundColor Red
-Write-Host "   ██║░░██║██║░░░██║██║╚██╔╝██║██╔══██╗" -ForegroundColor Red
-Write-Host "   ██████╔╝╚██████╔╝██║░╚═╝░██║██████╦╝" -ForegroundColor Red
-Write-Host "   ╚═════╝░░╚═════╝░╚═╝░░░░░╚═╝╚═════╝░" -ForegroundColor Red
+# Nuovo logo
+Write-Host ""
+Write-Host ""
+Write-Host -ForegroundColor Red "   ░██████╗███████╗██╗░░░░░███████╗";
+Write-Host -ForegroundColor Red "   ██╔════╝██╔════╝██║░░░░░██╔════╝";
+Write-Host -ForegroundColor Red "   ╚█████╗░█████╗░░██║░░░░░█████╗░░";
+Write-Host -ForegroundColor Red "   ░╚═══██╗██╔══╝░░██║░░░░░██╔══╝░░";
+Write-Host -ForegroundColor Red "   ██████╔╝███████╗███████╗██║░░░░░";
+Write-Host -ForegroundColor Red "   ╚═════╝░╚══════╝╚═╝░░░░░╚═╝░░░░░";
+Write-Host ""
+Write-Host -ForegroundColor Red "   ██████╗░░█████╗░███╗░░░███╗";
+Write-Host -ForegroundColor Red "   ██╔══██╗██╔══██╗████╗░████║";
+Write-Host -ForegroundColor Red "   ██████╦╝███████║██╔████╔██║";
+Write-Host -ForegroundColor Red "   ██╔══██╗██╔══██║██║╚██╔╝██║";
+Write-Host -ForegroundColor Red "   ██████╦╝██║░░██║██║░╚═╝░██║";
+Write-Host -ForegroundColor Red "   ╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝";
 
-Write-Host "" -ForegroundColor Blue
-Write-Host "   Made by Srdomy" -ForegroundColor Blue
+Write-Host ""
+Write-Host -ForegroundColor Blue "   Made by Srdomy"
 Write-Host ""
 
 # Funzione per controllare se si dispone dei privilegi di amministratore
@@ -107,7 +76,8 @@ $sw = [Diagnostics.Stopwatch]::StartNew()
 if (!(Get-PSDrive -Name HKLM -PSProvider Registry)) {
     Try {
         New-PSDrive -Name HKLM -PSProvider Registry -Root HKEY_LOCAL_MACHINE
-    } Catch {
+    }
+    Catch {
         Write-Warning "Error Mounting HKEY_Local_Machine"
     }
 }
@@ -117,7 +87,8 @@ Try {
     $Users = foreach($ii in $bv) {
         Get-ChildItem -Path "HKLM:\SYSTEM\CurrentControlSet\Services\$($ii)\UserSettings\" | Select-Object -ExpandProperty PSChildName
     }
-} Catch {
+}
+Catch {
     Write-Warning "Error Parsing BAM Key. Likely unsupported Windows Version"
     Exit
 }
@@ -131,6 +102,13 @@ $UserDay = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZ
 $Bam = Foreach ($Sid in $Users) {
     $u++
     foreach($rp in $rpath) {
+        # Controllo se la chiave UserSettings esiste
+        $keyStatus = Check-UserSettingsKey -Sid $Sid -rp $rp
+        if ($keyStatus -like "bypassarti") {
+            Write-Host -ForegroundColor Yellow $keyStatus
+            continue
+        }
+
         $BamItems = Get-Item -Path "$($rp)UserSettings\$Sid" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Property
         Write-Host -ForegroundColor Red "Extracting " -NoNewLine
         Write-Host -ForegroundColor Blue "$($rp)UserSettings\$SID"
@@ -139,7 +117,8 @@ $Bam = Foreach ($Sid in $Users) {
             $objSID = New-Object System.Security.Principal.SecurityIdentifier($Sid)
             $User = $objSID.Translate([System.Security.Principal.NTAccount]) 
             $User = $User.Value
-        } Catch {
+        }
+        Catch {
             $User = ""
         }
         $i = 0
@@ -155,7 +134,7 @@ $Bam = Foreach ($Sid in $Users) {
                 $Day = -([convert]::ToInt32([Convert]::ToString($UserDay,2),2)) 
                 $Biasd = $Bias / 60
                 $Dayd = $Day / 60
-                $TimeUser = (Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))).addminutes($Bias) -Format "yyyy-MM-dd HH:mm:ss") 
+                $TImeUser = (Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))).addminutes($Bias) -Format "yyyy-MM-dd HH:mm:ss") 
                 
                 # File path e controllo
                 $d = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { ((split-path -path $item).Remove(23)).trimstart("\Device\HarddiskVolume") } else { $d = "" }
@@ -163,36 +142,22 @@ $Bam = Foreach ($Sid in $Users) {
                 $cp = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { ($item).Remove(1,23) } else { $cp = "" }
                 $path = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Join-Path -Path "C:" -ChildPath $cp } else { $path = "" } 
                 
-                # Verifica Firma e stato file
-                $sig = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Get-Signature -FilePath $path } else { $sig = "" }
-                $driveInfo = if ($path) { Get-DriveInfo -FilePath $path } else { "N/A" }
-                $deletionStatus = if ($path) { Check-FileDeletion -FilePath $path } else { "N/A" }
-                $originalExtension = [System.IO.Path]::GetExtension($item)  # Estensione originale
+                # File system del disco
+                $Drive = if ($path -ne "") { Get-DriveInfo -FilePath $path } else { $Drive = "" }
+                $FileSystem = if ($Drive -ne "") { Get-DriveFileSystem -DriveLetter $Drive } else { $FileSystem = "" }
 
-                $extensionStatus = if ($path) { Check-FileExtensionChange -FilePath $path -OriginalExtension $originalExtension } else { "N/A" }
-
-                [PSCustomObject]@{
-                    'Examiner Time' = $TimeLocal
-                    'Last Execution Time (UTC)' = $TimeUTC
-                    'Last Execution User Time' = $TimeUser
-                    Application = $f
-                    Path = $path
-                    Signature = $Sig
-                    Drive = $driveInfo
-                    'Deletion Status' = $deletionStatus
-                    'Extension Status' = $extensionStatus
-                    User = $User
-                    SID = $Sid
-                    Regpath = $rp
-                }
+                # Risultati
+                $f,
+                $User,
+                $TImeUser,
+                $FileSystem,
+                $Drive | Out-String | Write-Host
             }
         }
     }
 }
+$sw.Stop()
 
-$Bam | Out-GridView -PassThru -Title "BAM key entries $($Bam.count)  - User TimeZone: ($UserTime) -> ActiveBias: ($Bias) - DayLightTime: ($Day)"
-
-$sw.stop()
-$t = $sw.Elapsed.TotalMinutes
 Write-Host ""
-Write-Host "Elapsed Time $t Minutes" -ForegroundColor Yellow
+Write-Host -ForegroundColor Red "Execution Finished in $($sw.Elapsed.TotalSeconds) seconds."
+Start-Sleep 20
