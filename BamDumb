@@ -3,7 +3,7 @@ $ErrorActionPreference = "SilentlyContinue"
 # Funzione per ottenere la firma del file
 function Get-Signature {
     [CmdletBinding()]
-     param (
+    param (
         [string[]]$FilePath
     )
 
@@ -34,13 +34,41 @@ function Get-Signature {
     }
 }
 
-# Funzione per determinare su quale disco si trova il file
-function Get-DriveInfo {
+# Funzione per determinare il tipo di file system dell'hard disk
+function Get-FileSystemType {
     param (
         [string]$FilePath
     )
-    $driveLetter = $FilePath.Split(":")[0]
-    return $driveLetter
+
+    # Ottieni la lettera del drive
+    $driveLetter = $FilePath.Split(":")[0] + ":"
+
+    # Ottieni il tipo di file system (NTFS, FAT32, etc.)
+    $driveInfo = Get-WmiObject -Class Win32_LogicalDisk | Where-Object { $_.DeviceID -eq $driveLetter }
+    
+    if ($driveInfo) {
+        return $driveInfo.FileSystem
+    } else {
+        return "FileSystem Not Found"
+    }
+}
+
+# Funzione per controllare se l'hard disk esiste ancora
+function Check-DriveExists {
+    param (
+        [string]$FilePath
+    )
+
+    # Ottieni la lettera del drive
+    $driveLetter = $FilePath.Split(":")[0] + ":"
+
+    # Verifica se il drive esiste
+    $driveExists = Test-Path $driveLetter
+    if ($driveExists) {
+        return "Drive Exists"
+    } else {
+        return "Drive Not Found"
+    }
 }
 
 # Funzione per controllare se il file è stato eliminato o spostato nel cestino
@@ -68,34 +96,34 @@ function Check-FileDeletion {
 
 Clear-Host
 
-# Logo migliorato
+# Interfaccia grafica di avvio
 Write-Host ""
 Write-Host ""
-Write-Host -ForegroundColor Red "██████╗░██╗░░░██╗███╗░░░███╗██████╗░"
-Write-Host -ForegroundColor Red "██╔══██╗██║░░░██║████╗░████║██╔══██╗"
-Write-Host -ForegroundColor Red "██║░░██║██║░░░██║██╔████╔██║██████╦╝"
-Write-Host -ForegroundColor Red "██║░░██║██║░░░██║██║╚██╔╝██║██╔══██╗"
-Write-Host -ForegroundColor Red "██████╔╝╚██████╔╝██║░╚═╝░██║██████╦╝"
-Write-Host -ForegroundColor Red "╚═════╝░░╚═════╝░╚═╝░░░░░╚═╝╚═════╝░"
+Write-Host -ForegroundColor Red "   ██████╗░██╗░░░██╗███╗░░░███╗██████╗░";
+Write-Host -ForegroundColor Red "   ██╔══██╗██║░░░██║████╗░████║██╔══██╗";
+Write-Host -ForegroundColor Red "   ██║░░██║██║░░░██║██╔████╔██║██████╦╝";
+Write-Host -ForegroundColor Red "   ██║░░██║██║░░░██║██║╚██╔╝██║██╔══██╗";
+Write-Host -ForegroundColor Red "   ██████╔╝╚██████╔╝██║░╚═╝░██║██████╦╝";
+Write-Host -ForegroundColor Red "   ╚═════╝░░╚═════╝░╚═╝░░░░░╚═╝╚═════╝░";
 
 Write-Host ""
-Write-Host -ForegroundColor Red "░██████╗░██████╗"
-Write-Host -ForegroundColor Red "██╔════╝██╔════╝"
-Write-Host -ForegroundColor Red "╚█████╗░╚█████╗░"
-Write-Host -ForegroundColor Red "░╚═══██╗░╚═══██╗"
-Write-Host -ForegroundColor Red "██████╔╝██████╔╝"
-Write-Host -ForegroundColor Red "╚═════╝░╚═════╝░"
+Write-Host -ForegroundColor Red "   ░██████╗░██████╗";
+Write-Host -ForegroundColor Red "   ██╔════╝██╔════╝";
+Write-Host -ForegroundColor Red "   ╚█████╗░╚█████╗░";
+Write-Host -ForegroundColor Red "   ░╚═══██╗░╚═══██╗";
+Write-Host -ForegroundColor Red "   ██████╔╝██████╔╝";
+Write-Host -ForegroundColor Red "   ╚═════╝░╚═════╝░";
 
 Write-Host ""
-Write-Host -ForegroundColor Red "██████╗░░█████╗░███╗░░░███╗"
-Write-Host -ForegroundColor Red "██╔══██╗██╔══██╗████╗░████║"
-Write-Host -ForegroundColor Red "██████╦╝███████║██╔████╔██║"
-Write-Host -ForegroundColor Red "██╔══██╗██╔══██║██║╚██╔╝██║"
-Write-Host -ForegroundColor Red "██████╦╝██║░░██║██║░╚═╝░██║"
-Write-Host -ForegroundColor Red "╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝"
+Write-Host -ForegroundColor Red "   ██████╗░░█████╗░███╗░░░███╗";
+Write-Host -ForegroundColor Red "   ██╔══██╗██╔══██╗████╗░████║";
+Write-Host -ForegroundColor Red "   ██████╦╝███████║██╔████╔██║";
+Write-Host -ForegroundColor Red "   ██╔══██╗██╔══██║██║╚██╔╝██║";
+Write-Host -ForegroundColor Red "   ██████╦╝██║░░██║██║░╚═╝░██║";
+Write-Host -ForegroundColor Red "   ╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝";
 
 Write-Host ""
-Write-Host -ForegroundColor Blue "Made by Srdomy"
+Write-Host -ForegroundColor Blue "   Made by Srdomy"
 Write-Host ""
 
 # Funzione per controllare se si dispone dei privilegi di amministratore
@@ -132,6 +160,7 @@ Catch {
 }
 
 $rpath = @("HKLM:\SYSTEM\CurrentControlSet\Services\bam\","HKLM:\SYSTEM\CurrentControlSet\Services\bam\state\")
+
 $UserTime = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation").TimeZoneKeyName
 $UserBias = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation").ActiveTimeBias
 $UserDay = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation").DaylightBias
@@ -141,32 +170,21 @@ $Bam = Foreach ($Sid in $Users) {
         $BamItems = Get-Item -Path "$($rp)UserSettings\$Sid" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Property
         Write-Host -ForegroundColor Red "Extracting " -NoNewLine
         Write-Host -ForegroundColor Blue "$($rp)UserSettings\$SID"
-        $bi = 0 
-        Try {
-            $objSID = New-Object System.Security.Principal.SecurityIdentifier($Sid)
-            $User = $objSID.Translate([System.Security.Principal.NTAccount]) 
-            $User = $User.Value
-        }
-        Catch {
-            $User = ""
-        }
-        $i = 0
-        ForEach ($Item in $BamItems) {
-            $i++
+        foreach ($Item in $BamItems) {
             $Key = Get-ItemProperty -Path "$($rp)UserSettings\$Sid" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty $Item
 
-            if ($key.length -eq 24) {
-                $Hex = [System.BitConverter]::ToString($key[7..0]) -replace "-",""
+            if ($Key.length -eq 24) {
+                $Hex = [System.BitConverter]::ToString($Key[7..0]) -replace "-",""
                 $TimeLocal = Get-Date ([DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
-                $TimeUTC = (Get-Date ([DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss").ToUniversalTime()
-                $TimeUser = [DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16)).AddMinutes($UserBias)
-                $BiasD = [DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16)).AddMinutes($UserDay)
-                $d = Get-DriveInfo "$Item"
-                if ($item -match '\d{1}') { Get-Signature "$((split-path -path $item).Remove(23)).trimstart("\Device\HarddiskVolume")" } else { $f = "" }
-
-                Write-Output "$i|$User|$Item|Last Run Time (Local) $TimeLocal|Last Run Time (UTC) $TimeUTC|Last Run Time (User) $TimeUser UTC+$BiasD Daylight+ $Dayd |Path $d |FileStatus $f"
+                $TimeUTC = Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
+                Write-Host -NoNewLine "$($Item) : $($Key) => "
+                Write-Host -ForegroundColor Green "[$($TimeLocal)] (Local)"
+                Write-Host -ForegroundColor Yellow "[$($TimeUTC)] (UTC)"
             }
         }
     }
 }
 
+$sw.Stop()
+
+Write-Host "Elapsed Time: $($sw.Elapsed.TotalSeconds) Seconds"
