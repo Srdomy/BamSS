@@ -60,21 +60,16 @@ Clear-Host
 
 # Interfaccia grafica di avvio
 Write-Host "" -ForegroundColor Red
-Write-Host "   ░██████╗███████╗██╗░░░░░███████╗" -ForegroundColor Red
-Write-Host "   ██╔════╝██╔════╝██║░░░░░██╔════╝" -ForegroundColor Red
-Write-Host "   ╚█████╗░█████╗░░██║░░░░░█████╗░░" -ForegroundColor Red
-Write-Host "   ░╚═══██╗██╔══╝░░██║░░░░░██╔══╝░░" -ForegroundColor Red
-Write-Host "   ██████╔╝███████╗███████╗██║░░░░░" -ForegroundColor Red
-Write-Host "   ╚═════╝░╚══════╝╚══════╝╚═╝░░░░░" -ForegroundColor Red
-
-Write-Host "" -ForegroundColor Blue
-Write-Host "██████╗░░█████╗░███╗░░░███╗" -ForegroundColor Blue
-Write-Host "██╔══██╗██╔══██╗████╗░████║" -ForegroundColor Blue
-Write-Host "██████╦╝███████║██╔████╔██║" -ForegroundColor Blue
-Write-Host "██╔══██╗██╔══██║██║╚██╔╝██║" -ForegroundColor Blue
-Write-Host "██████╦╝██║░░██║██║░╚═╝░██║" -ForegroundColor Blue
-Write-Host "╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝" -ForegroundColor Blue
-Write-Host ""
+Write-Host "░▒▓███████▓▒░▒▓████████▓▒░▒▓█▓▒░      ░▒▓████████▓▒░      ░▒▓███████▓▒░ ░▒▓██████▓▒░░▒▓██████████████▓▒░       ░▒▓█▓▒░░▒▓█▓▒░  ░▒▓█▓▒░ " -ForegroundColor Red
+Write-Host "░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓████▓▒░ " -ForegroundColor Red
+Write-Host "░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░       ░▒▓█▓▒▒▓█▓▒░   ░▒▓█▓▒░ " -ForegroundColor Red
+Write-Host " ░▒▓██████▓▒░░▒▓██████▓▒░ ░▒▓█▓▒░      ░▒▓██████▓▒░        ░▒▓███████▓▒░░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░       ░▒▓█▓▒▒▓█▓▒░   ░▒▓█▓▒░ " -ForegroundColor Red
+Write-Host "       ░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░        ░▒▓█▓▓█▓▒░    ░▒▓█▓▒░ " -ForegroundColor Red
+Write-Host "       ░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░        ░▒▓█▓▓█▓▒░    ░▒▓█▓▒░ " -ForegroundColor Red
+Write-Host "░▒▓███████▓▒░░▒▓████████▓▒░▒▓████████▓▒░▒▓█▓▒░             ░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░         ░▒▓██▓▒░     ░▒▓█▓▒░ " -ForegroundColor Red
+Write-Host "                                                                                                                                        " -ForegroundColor Red
+Write-Host "  *Made by Srdomy*" -ForegroundColor Gray -NoNewline
+Write-Host "" -ForegroundColor Gray
 
 # Funzione per controllare se si dispone dei privilegi di amministratore
 function Test-Admin {
@@ -100,7 +95,7 @@ if (!(Get-PSDrive -Name HKLM -PSProvider Registry)) {
 
 Write-Host "Registry access verified." -ForegroundColor Green
 
-# Get BAM users
+# Ottieni utenti BAM
 $bv = ("bam", "bam\State")
 Try {
     $Users = foreach($ii in $bv) {
@@ -139,45 +134,51 @@ $Bam = foreach ($Sid in $Users) {
             if ($key.length -eq 24) {
                 $Hex = [System.BitConverter]::ToString($key[7..0]) -replace "-",""
                 $TimeLocal = Get-Date ([DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
-                $TimeUTC = Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
-                $Bias = -([convert]::ToInt32([Convert]::ToString($UserBias,2),2))
-                $Day = -([convert]::ToInt32([Convert]::ToString($UserDay,2),2)) 
-                $Biasd = $Bias / 60
-                $Dayd = $Day / 60
-                $TimeUser = (Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))).addminutes($Bias) -Format "yyyy-MM-dd HH:mm:ss") 
-                
-                # File path e controllo
-                $d = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { ((split-path -path $item).Remove(23)).trimstart("\Device\HarddiskVolume") } else { $d = "" }
-                $f = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Split-path -leaf ($item).TrimStart() } else { $item } 
-                $cp = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { ($item).Remove(1,23) } else { $cp = "" }
-                $path = if (((split-path -path $item | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') { Join-Path -Path "C:" -ChildPath $cp } else { $item } 
+                $TimeUTC = Get-Date -Date $TimeLocal -Format "yyyy-MM-dd HH:mm:ss" -uformat "%Y-%m-%d %H:%M:%S" -AsUTC
+                $Biasd = $UserBias
+                $Dayd = $UserDay
+                $path = [System.Text.Encoding]::UTF8.GetString($key[15..12]) -replace [char]0, ""
+                $d = $path.Substring(0,1)
 
-                $driveInfo = Get-DriveInfo -FilePath $path
-                $Sig = Get-Signature -FilePath $path
-                $deletionStatus = Check-FileDeletion -FilePath $path
-
-                # Creazione oggetto BAM
-                [PSCustomObject]@{
-                    'Time UTC' = $TimeUTC
-                    'Time Local' = $TimeLocal
-                    'User Time' = $TimeUser
-                    'Bias' = $Biasd
-                    'Daylight Bias' = $Dayd
-                    Path = $path
-                    Signature = $Sig
-                    Drive = $driveInfo.Drive
-                    FileSystem = $driveInfo.FileSystem
-                    'Deletion Status' = $deletionStatus
-                    User = $User
-                    SID = $Sid
-                    Regpath = $rp
+                if (Test-Path -Path "$($d):\$($f)") {
+                    $driveInfo = Get-DriveInfo -FilePath $path
+                    $Sig = Get-Signature -FilePath $path
+                    $deletionStatus = Check-FileDeletion -FilePath $path
+                    
+                    # Creazione oggetto BAM
+                    [PSCustomObject]@{
+                        'Time UTC' = $TimeUTC
+                        'Time Local' = $TimeLocal
+                        'User Time' = $TimeUser
+                        'Bias' = $Biasd
+                        'Daylight Bias' = $Dayd
+                        Path = $path
+                        Signature = $Sig
+                        Drive = $driveInfo.Drive
+                        FileSystem = $driveInfo.FileSystem
+                        'Deletion Status' = $deletionStatus
+                        User = $User
+                        SID = $Sid
+                        Regpath = $rp
+                    }
                 }
             }
         }
     }
 }
 
+# Funzione per cercare chiavi recenti
+function Get-RecentKeys {
+    $recentKeysPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    $recentKeys = Get-ItemProperty -Path $recentKeysPath | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
+    return $recentKeys
+}
+
+$RecentKeys = Get-RecentKeys
+
+# Mostra il contenuto di BAM e le chiavi recenti
 $Bam | Out-GridView -PassThru -Title "BAM key entries $($Bam.count) - User TimeZone: ($UserTime) -> ActiveBias: ($Bias) - DayLightTime: ($Day)"
+$RecentKeys | Out-GridView -PassThru -Title "Recent Installed Applications"
 
 Write-Host ""
 $t = (Get-Date) - $start
