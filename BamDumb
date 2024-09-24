@@ -35,7 +35,12 @@ function Check-FileDeletion {
 
     $recycleBinPath = "$env:SystemDrive\$Recycle.Bin"
     $foundInRecycle = Get-ChildItem -Recurse -Force $recycleBinPath | Where-Object { $_.FullName -like "*$FilePath*" }
-    return $foundInRecycle ? "File Moved to Recycle Bin" : "File Deleted Permanently (Shift+Del or Cleared from Recycle Bin)"
+    
+    if ($foundInRecycle) {
+        return "File Moved to Recycle Bin"
+    } else {
+        return "File Deleted Permanently (Shift+Del or Cleared from Recycle Bin)"
+    }
 }
 
 Clear-Host
