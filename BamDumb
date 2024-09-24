@@ -104,7 +104,7 @@ $Bam = Foreach ($Sid in $Users) {
     foreach($rp in $rpath) {
         # Controllo se la chiave UserSettings esiste
         $keyStatus = Check-UserSettingsKey -Sid $Sid -rp $rp
-        if ($keyStatus -like "bypassarti") {
+        if ($keyStatus -like "*bypassarti*") {
             Write-Host -ForegroundColor Yellow $keyStatus
             continue
         }
@@ -160,4 +160,4 @@ $sw.Stop()
 
 Write-Host ""
 Write-Host -ForegroundColor Red "Execution Finished in $($sw.Elapsed.TotalSeconds) seconds."
-Start-Sleep 20
+Start-Sleep 20
