@@ -13,13 +13,17 @@ function Get-Signature {
     if ($Existence) {
         if ($Authenticode -eq "Valid") {
             $Signature = "Valid Signature"
-        } elseif ($Authenticode -eq "NotSigned") {
+        }
+        elseif ($Authenticode -eq "NotSigned") {
             $Signature = "Invalid Signature (NotSigned)"
-        } elseif ($Authenticode -eq "HashMismatch") {
+        }
+        elseif ($Authenticode -eq "HashMismatch") {
             $Signature = "Invalid Signature (HashMismatch)"
-        } elseif ($Authenticode -eq "NotTrusted") {
+        }
+        elseif ($Authenticode -eq "NotTrusted") {
             $Signature = "Invalid Signature (NotTrusted)"
-        } elseif ($Authenticode -eq "UnknownError") {
+        }
+        elseif ($Authenticode -eq "UnknownError") {
             $Signature = "Invalid Signature (UnknownError)"
         }
         return $Signature
@@ -29,52 +33,51 @@ function Get-Signature {
     }
 }
 
-# Function to get disk information
 function Get-DiskInfo {
-    param (
-        [string]$FilePath
-    )
+    param([string]$FilePath)
     
-    $driveLetter = [System.IO.Path]::GetPathRoot($FilePath)
-    $disk = Get-Volume -DriveLetter $driveLetter.TrimEnd(':')
-    return [PSCustomObject]@{
-        DriveLetter = $driveLetter
-        FileSystem = $disk.FileSystem
-    }
+    $drive = ($FilePath -split ":")[0] + ":"
+    $diskInfo = Get-Volume -DriveLetter $drive | Select-Object DriveLetter, FileSystem
+    return $diskInfo
 }
 
-# Function to determine if a file is suspicious
 function Is-Suspicious {
-    param (
-        [string]$FilePath,
-        [string]$SignatureStatus
-    )
+    param([string]$FilePath, [string]$SignatureStatus)
     
-    # Simple example: you might check against a list of known malware or use some heuristic
-    if ($SignatureStatus -match "Invalid Signature") {
-        return $true
+    $isSuspicious = $false
+
+    # Check file signature
+    if ($SignatureStatus -notmatch "Valid Signature") {
+        $isSuspicious = $true
     }
-    
-    # Further checks could be added here (e.g., using antivirus scanning)
-    return $false
+
+    # Check if file is flagged by Windows Defender
+    $defenderStatus = (Get-MpThreatDetection -FilePath $FilePath -ErrorAction SilentlyContinue).DetectionStatus
+    if ($defenderStatus -eq "Detected") {
+        $isSuspicious = $true
+    }
+
+    return $isSuspicious
 }
 
-# Logo Display
 Clear-Host
-Write-Host -ForegroundColor Red "  ██████╗ ███████╗████████╗████████╗███████╗██████╗ ██████╗  █████╗ ███╗   ███╗"
-Write-Host -ForegroundColor Red "  ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗██╔══██╗██╔══██╗████╗ ████║"
-Write-Host -ForegroundColor Red "  ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝██████╔╝███████║██╔████╔██║"
-Write-Host -ForegroundColor Red "  ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗██╔══██╗██╔══██║██║╚██╔╝██║"
-Write-Host -ForegroundColor Red "  ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║██████╔╝██║  ██║██║ ╚═╝ ██║"
-Write-Host -ForegroundColor Red "  ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝"
-Write-Host -ForegroundColor Blue " Made By Srdomy
+
+Write-Host ""
+Write-Host ""
+Write-Host -ForegroundColor Red "   ██████╗ ███████╗██████╗     ██╗      ██████╗ ████████╗██╗   ██╗███████╗    ██████╗  █████╗ ███╗   ███╗";
+Write-Host -ForegroundColor Red "   ██╔══██╗██╔════╝██╔══██╗    ██║     ██╔═══██╗╚══██╔══╝██║   ██║██╔════╝    ██╔══██╗██╔══██╗████╗ ████║";
+Write-Host -ForegroundColor Red "   ██████╔╝█████╗  ██║  ██║    ██║     ██║   ██║   ██║   ██║   ██║███████╗    ██████╔╝███████║██╔████╔██║";
+Write-Host -ForegroundColor Red "   ██╔══██╗██╔══╝  ██║  ██║    ██║     ██║   ██║   ██║   ██║   ██║╚════██║    ██╔══██╗██╔══██║██║╚██╔╝██║";
+Write-Host -ForegroundColor Red "   ██║  ██║███████╗██████╔╝    ███████╗╚██████╔╝   ██║   ╚██████╔╝███████║    ██████╔╝██║  ██║██║ ╚═╝ ██║";
+Write-Host -ForegroundColor Red "   ╚═╝  ╚═╝╚══════╝╚═════╝     ╚══════╝ ╚═════╝    ╚═╝    ╚═════╝ ╚══════╝    ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝";
+Write-Host ""
+Write-Host -ForegroundColor Blue "  Updated by Srdomy
 Write-Host ""
 
 function Test-Admin {
     $currentUser = New-Object Security.Principal.WindowsPrincipal $([Security.Principal.WindowsIdentity]::GetCurrent())
-    $currentUser.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+    $currentUser.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator);
 }
-
 if (!(Test-Admin)) {
     Write-Warning "Please Run This Script as Admin."
     Start-Sleep 10
@@ -83,22 +86,22 @@ if (!(Test-Admin)) {
 
 $sw = [Diagnostics.Stopwatch]::StartNew()
 
-if (!(Get-PSDrive -Name HKLM -PSProvider Registry)){
-    Try { New-PSDrive -Name HKLM -PSProvider Registry -Root HKEY_LOCAL_MACHINE }
-    Catch { Write-Warning "Error Mounting HKEY_Local_Machine" }
+if (!(Get-PSDrive -Name HKLM -PSProvider Registry)) {
+    Try {
+        New-PSDrive -Name HKLM -PSProvider Registry -Root HKEY_LOCAL_MACHINE
+    } Catch {
+        Write-Warning "Error Mounting HKEY_Local_Machine"
+    }
 }
-
 $bv = ("bam", "bam\State")
 Try {
     $Users = foreach($ii in $bv) {
         Get-ChildItem -Path "HKLM:\SYSTEM\CurrentControlSet\Services\$($ii)\UserSettings\" | Select-Object -ExpandProperty PSChildName
     }
-}
-Catch {
+} Catch {
     Write-Warning "Error Parsing BAM Key. Likely unsupported Windows Version"
     Exit
 }
-
 $rpath = @("HKLM:\SYSTEM\CurrentControlSet\Services\bam\", "HKLM:\SYSTEM\CurrentControlSet\Services\bam\state\")
 
 $UserTime = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation").TimeZoneKeyName
@@ -118,15 +121,16 @@ $Bam = foreach ($Sid in $Users) {
             $objSID = New-Object System.Security.Principal.SecurityIdentifier($Sid)
             $User = $objSID.Translate([System.Security.Principal.NTAccount]) 
             $User = $User.Value
+        } Catch {
+            $User = ""
         }
-        Catch { $User = "" }
-        
+
         $i = 0
         ForEach ($Item in $BamItems) {
             $i++
             $Key = Get-ItemProperty -Path "$($rp)UserSettings\$Sid" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty $Item
 
-            if ($key.length -eq 24) {
+            If ($key.length -eq 24) {
                 $Hex = [System.BitConverter]::ToString($key[7..0]) -replace "-", ""
                 $TimeLocal = Get-Date ([DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
                 $TimeUTC = Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
@@ -135,6 +139,7 @@ $Bam = foreach ($Sid in $Users) {
                 $Biasd = $Bias / 60
                 $Dayd = $Day / 60
                 $TimeUser = (Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))).addminutes($Bias) -Format "yyyy-MM-dd HH:mm:ss") 
+                
                 $d = if((((split-path -path $item) | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') {
                     ((split-path -path $item).Remove(23)).trimstart("\Device\HarddiskVolume")
                 } else {
@@ -144,19 +149,24 @@ $Bam = foreach ($Sid in $Users) {
                     Split-path -leaf ($item).TrimStart()
                 } else {
                     $item
-                }
+                }    
                 $cp = if((((split-path -path $item) | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') {
                     ($item).Remove(1, 23)
                 } else {
                     ""
                 }
                 $path = if((((split-path -path $item) | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') {
-                    $cp + $f
+                    Join-Path -Path "C:" -ChildPath $cp
                 } else {
-                    $item
+                    ""
+                }			
+                $sig = if((((split-path -path $item) | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') {
+                    Get-Signature -FilePath $path
+                } else {
+                    "Invalid Signature (NotFile)"
                 }
                 
-                $sig = Get-Signature -FilePath $path
+                # Get disk info and check for suspicious files
                 $diskInfo = Get-DiskInfo -FilePath $path
                 $isSuspicious = Is-Suspicious -FilePath $path -SignatureStatus $sig
 
@@ -164,24 +174,23 @@ $Bam = foreach ($Sid in $Users) {
                     'Examiner Time' = $TimeLocal
                     'Last Execution Time (UTC)' = $TimeUTC
                     'Last Execution User Time' = $TimeUser
-                    Application = $f
-                    Path = $path
-                    Signature = $sig
-                    User = $User
-                    SID = $Sid
-                    Regpath = $rp
-                    DriveLetter = $diskInfo.DriveLetter
-                    FileSystem = $diskInfo.FileSystem
-                    IsSuspicious = if ($isSuspicious) { "Yes" } else { "No" }
+                    'Application' = $f
+                    'Path' = $path
+                    'Disk' = $diskInfo.DriveLetter
+                    'FileSystem' = $diskInfo.FileSystem
+                    'Signature' = $sig
+                    'Suspicious' = $isSuspicious
+                    'User' = $User
+                    'SID' = $Sid
+                    'Regpath' = $rp
                 }
             }
         }
     }
 }
 
-$Bam | Out-GridView -PassThru -Title "BAM key entries $($Bam.count) - User TimeZone: ($UserTime) -> ActiveBias: ( $Bias) - DayLightTime: ($Day)"
+$sw.Stop()
+$Bam | Out-GridView -PassThru -Title "BAM key entries $($Bam.count) - Disk Info and Suspicious Files"
 
-$sw.stop()
-$t = [math]::Round($sw.Elapsed.TotalMinutes, 2) # Round to 2 decimal places
-Write-Host ""
-Write-Host "Elapsed Time: $t Minutes" -ForegroundColor Yellow
+# Final Output
+Write-Host "Total Time Taken: $($sw.Elapsed.TotalSeconds) seconds"
