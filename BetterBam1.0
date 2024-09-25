@@ -61,14 +61,13 @@ function Is-Suspicious {
 
 # Logo Display
 Clear-Host
-Write-Host -ForegroundColor Red "   ██████╗ ███████╗████████╗████████╗███████╗██████╗ ██████╗  █████╗ ███╗   ███╗"
-Write-Host -ForegroundColor Red "   ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗██╔══██╗██╔══██╗████╗ ████║"
-Write-Host -ForegroundColor Red "   ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝██████╔╝███████║██╔████╔██║"
-Write-Host -ForegroundColor Red "   ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗██╔══██╗██╔══██║██║╚██╔╝██║"
-Write-Host -ForegroundColor Red "   ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║██████╔╝██║  ██║██║ ╚═╝ ██║"
-Write-Host -ForegroundColor Red "   ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝"
+Write-Host -ForegroundColor Red "  ██████╗ ███████╗████████╗████████╗███████╗██████╗ ██████╗  █████╗ ███╗   ███╗"
+Write-Host -ForegroundColor Red "  ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗██╔══██╗██╔══██╗████╗ ████║"
+Write-Host -ForegroundColor Red "  ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝██████╔╝███████║██╔████╔██║"
+Write-Host -ForegroundColor Red "  ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗██╔══██╗██╔══██║██║╚██╔╝██║"
+Write-Host -ForegroundColor Red "  ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║██████╔╝██║  ██║██║ ╚═╝ ██║"
+Write-Host -ForegroundColor Red "  ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝"
 Write-Host -ForegroundColor Blue " Made By Srdomy
-Write-Host -ForegroundColor Red "  TG: withoutsurname"
 Write-Host ""
 
 function Test-Admin {
@@ -152,17 +151,12 @@ $Bam = foreach ($Sid in $Users) {
                     ""
                 }
                 $path = if((((split-path -path $item) | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') {
-                    Join-Path -Path "C:" -ChildPath $cp
+                    $cp + $f
                 } else {
-                    ""
-                }            
-                $sig = if((((split-path -path $item) | ConvertFrom-String -Delimiter "\\").P3) -match '\d{1}') {
-                    Get-Signature -FilePath $path
-                } else {
-                    "Invalid Signature (NotFile)"
+                    $item
                 }
-
-                # Get disk info and check for suspicious files
+                
+                $sig = Get-Signature -FilePath $path
                 $diskInfo = Get-DiskInfo -FilePath $path
                 $isSuspicious = Is-Suspicious -FilePath $path -SignatureStatus $sig
 
@@ -188,6 +182,6 @@ $Bam = foreach ($Sid in $Users) {
 $Bam | Out-GridView -PassThru -Title "BAM key entries $($Bam.count) - User TimeZone: ($UserTime) -> ActiveBias: ( $Bias) - DayLightTime: ($Day)"
 
 $sw.stop()
-$t = $sw.Elapsed.TotalMinutes
+$t = [math]::Round($sw.Elapsed.TotalMinutes, 2) # Round to 2 decimal places
 Write-Host ""
-Write-Host "Elapsed Time $t Minutes" -ForegroundColor Yellow
+Write-Host "Elapsed Time: $t Minutes" -ForegroundColor Yellow
