@@ -2,50 +2,31 @@ $ErrorActionPreference = "SilentlyContinue"
 
 # Funzione per ottenere la firma del file
 function Get-Signature {
-    [CmdletBinding()]
     param (
-        [string[]]$FilePath
+        [string]$FilePath
     )
 
-    $Existence = Test-Path -PathType "Leaf" -Path $FilePath
-    $Authenticode = (Get-AuthenticodeSignature -FilePath $FilePath -ErrorAction SilentlyContinue).Status
-    $Signature = "Invalid Signature (UnknownError)"
-
-    if ($Existence) {
-        if ($Authenticode -eq "Valid") {
-            $Signature = "Valid Signature"
+    if (Test-Path -PathType "Leaf" -Path $FilePath) {
+        $authStatus = (Get-AuthenticodeSignature -FilePath $FilePath -ErrorAction SilentlyContinue).Status
+        switch ($authStatus) {
+            "Valid" { return "Valid Signature" }
+            "NotSigned" { return "Invalid Signature (NotSigned)" }
+            "HashMismatch" { return "Invalid Signature (HashMismatch)" }
+            "NotTrusted" { return "Invalid Signature (NotTrusted)" }
+            default { return "Invalid Signature (UnknownError)" }
         }
-        elseif ($Authenticode -eq "NotSigned") {
-            $Signature = "Invalid Signature (NotSigned)"
-        }
-        elseif ($Authenticode -eq "HashMismatch") {
-            $Signature = "Invalid Signature (HashMismatch)"
-        }
-        elseif ($Authenticode -eq "NotTrusted") {
-            $Signature = "Invalid Signature (NotTrusted)"
-        }
-        elseif ($Authenticode -eq "UnknownError") {
-            $Signature = "Invalid Signature (UnknownError)"
-        }
-        return $Signature
     } else {
-        $Signature = "File Was Not Found"
-        return $Signature
+        return "File Was Not Found"
     }
 }
 
 # Funzione per determinare il tipo di file system dell'hard disk
 function Get-FileSystemType {
     param (
-        [string]$FilePath
+        [string]$DriveLetter
     )
 
-    # Ottieni la lettera del drive
-    $driveLetter = $FilePath.Split(":")[0] + ":"
-
-    # Ottieni il tipo di file system (NTFS, FAT32, etc.)
-    $driveInfo = Get-WmiObject -Class Win32_LogicalDisk | Where-Object { $_.DeviceID -eq $driveLetter }
-    
+    $driveInfo = Get-WmiObject -Class Win32_LogicalDisk | Where-Object { $_.DeviceID -eq $DriveLetter }
     if ($driveInfo) {
         return $driveInfo.FileSystem
     } else {
@@ -56,15 +37,10 @@ function Get-FileSystemType {
 # Funzione per controllare se l'hard disk esiste ancora
 function Check-DriveExists {
     param (
-        [string]$FilePath
+        [string]$DriveLetter
     )
 
-    # Ottieni la lettera del drive
-    $driveLetter = $FilePath.Split(":")[0] + ":"
-
-    # Verifica se il drive esiste
-    $driveExists = Test-Path $driveLetter
-    if ($driveExists) {
+    if (Test-Path $DriveLetter) {
         return "Drive Exists"
     } else {
         return "Drive Not Found"
@@ -77,114 +53,221 @@ function Check-FileDeletion {
         [string]$FilePath
     )
 
-    # Verifica se il file esiste
     if (Test-Path -Path $FilePath) {
         return "File Exists"
     }
-    
-    # Se non esiste, controlla il Cestino
-    $recycleBinPath = "$env:SystemDrive\$Recycle.Bin"
-    $recycleItems = Get-ChildItem -Recurse -Force $recycleBinPath | Where-Object { $_.PSIsContainer -eq $false } | Select-Object FullName
-    $foundInRecycle = $recycleItems | Where-Object { $_.FullName -like "*$FilePath*" }
 
-    if ($foundInRecycle) {
-        return "File Moved to Recycle Bin"
-    } else {
-        return "File Deleted Permanently (Shift+Del or Cleared from Recycle Bin)"
+    # Controlla il Cestino
+    try {
+        $recycleBinPath = "$env:SystemDrive\$Recycle.Bin"
+        $recycleItems = Get-ChildItem -Path $recycleBinPath -Recurse -Force -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Select-Object -ExpandProperty FullName
+        $foundInRecycle = $recycleItems -like "*$FilePath*"
+        if ($foundInRecycle) {
+            return "File Moved to Recycle Bin"
+        } else {
+            return "File Deleted Permanently (Shift+Del or Cleared from Recycle Bin)"
+        }
+    } catch {
+        return "Error Checking Recycle Bin"
     }
 }
 
+# Funzione per verificare e avviare il servizio BAM
+function Ensure-BAMService {
+    $service = Get-Service -Name bam -ErrorAction SilentlyContinue
+    if ($service) {
+        if ($service.Status -ne 'Running') {
+            Write-Host "Starting BAM service..." -ForegroundColor Green
+            try {
+                Start-Service -Name bam -ErrorAction Stop
+                Write-Host "BAM service started." -ForegroundColor Green
+            }
+            catch {
+                Write-Warning "Failed to start BAM service: $_"
+            }
+        }
+        else {
+            Write-Host "BAM service is already running." -ForegroundColor Green
+        }
+    }
+    else {
+        Write-Warning "BAM service not found."
+    }
+}
+
+# Pulizia della console
 Clear-Host
 
-# Interfaccia grafica di avvio
-Write-Host ""
-Write-Host ""
-Write-Host -ForegroundColor Red "   ██████╗░██╗░░░██╗███╗░░░███╗██████╗░";
-Write-Host -ForegroundColor Red "   ██╔══██╗██║░░░██║████╗░████║██╔══██╗";
-Write-Host -ForegroundColor Red "   ██║░░██║██║░░░██║██╔████╔██║██████╦╝";
-Write-Host -ForegroundColor Red "   ██║░░██║██║░░░██║██║╚██╔╝██║██╔══██╗";
-Write-Host -ForegroundColor Red "   ██████╔╝╚██████╔╝██║░╚═╝░██║██████╦╝";
-Write-Host -ForegroundColor Red "   ╚═════╝░░╚═════╝░╚═╝░░░░░╚═╝╚═════╝░";
+# Logo migliorato su una sola linea
+$logo = "██████╗░██╗░░░██╗███╗░░░███╗██████╗░██╔══██╗██║░░░██║████╗░████║██╔══██╗██║░░██║██║░░░██║██╔████╔██║██████╦╝██║░░██║██║░░░██║██║╚██╔╝██║██╔══██╗██████╔╝╚██████╔╝██║░╚═╝░██║██████╦╝╚═════╝░░╚═════╝░╚═╝░░░░░╚═╝╚═════╝░░██████╗░██████╗██╔════╝██╔════╝╚█████╗░╚█████╗░░╚═══██╗░╚═══██╗██████╔╝██████╔╝╚═════╝░╚═════╝░██████╗░░█████╗░███╗░░░███╗██╔══██╗██╔══██╗████╗░████║██████╦╝███████║██╔████╔██║██╔══██╗██╔══██║██║╚██╔╝██║██████╦╝██║░░██║██║░╚═╝░██║╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝ Made by Srdomy"
 
-Write-Host ""
-Write-Host -ForegroundColor Red "   ░██████╗░██████╗";
-Write-Host -ForegroundColor Red "   ██╔════╝██╔════╝";
-Write-Host -ForegroundColor Red "   ╚█████╗░╚█████╗░";
-Write-Host -ForegroundColor Red "   ░╚═══██╗░╚═══██╗";
-Write-Host -ForegroundColor Red "   ██████╔╝██████╔╝";
-Write-Host -ForegroundColor Red "   ╚═════╝░╚═════╝░";
-
-Write-Host ""
-Write-Host -ForegroundColor Red "   ██████╗░░█████╗░███╗░░░███╗";
-Write-Host -ForegroundColor Red "   ██╔══██╗██╔══██╗████╗░████║";
-Write-Host -ForegroundColor Red "   ██████╦╝███████║██╔████╔██║";
-Write-Host -ForegroundColor Red "   ██╔══██╗██╔══██║██║╚██╔╝██║";
-Write-Host -ForegroundColor Red "   ██████╦╝██║░░██║██║░╚═╝░██║";
-Write-Host -ForegroundColor Red "   ╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝";
-
-Write-Host ""
-Write-Host -ForegroundColor Blue "   Made by Srdomy"
+Write-Host $logo -ForegroundColor Red
 Write-Host ""
 
 # Funzione per controllare se si dispone dei privilegi di amministratore
 function Test-Admin {
     $currentUser = New-Object Security.Principal.WindowsPrincipal $([Security.Principal.WindowsIdentity]::GetCurrent())
-    $currentUser.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+    return $currentUser.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
 }
+
 if (!(Test-Admin)) {
     Write-Warning "Please Run This Script as Admin."
     Start-Sleep 10
     Exit
 }
 
+# Avvia il timer
 $sw = [Diagnostics.Stopwatch]::StartNew()
 
-if (!(Get-PSDrive -Name HKLM -PSProvider Registry)) {
+# Assicurarsi che il drive HKLM sia montato
+if (!(Get-PSDrive -Name HKLM -PSProvider Registry -ErrorAction SilentlyContinue)) {
     Try {
-        New-PSDrive -Name HKLM -PSProvider Registry -Root HKEY_LOCAL_MACHINE
+        New-PSDrive -Name HKLM -PSProvider Registry -Root HKEY_LOCAL_MACHINE -ErrorAction Stop
     }
     Catch {
-        Write-Warning "Error Mounting HKEY_Local_Machine"
+        Write-Warning "Error Mounting HKEY_LOCAL_MACHINE: $_"
+        Exit
     }
 }
 
-$bv = ("bam", "bam\State")
-Try {
-    $Users = foreach($ii in $bv) {
-        Get-ChildItem -Path "HKLM:\SYSTEM\CurrentControlSet\Services\$($ii)\UserSettings\" | Select-Object -ExpandProperty PSChildName
+# Percorsi del registro BAM
+$bamPaths = @("HKLM:\SYSTEM\CurrentControlSet\Services\bam\UserSettings\", "HKLM:\SYSTEM\CurrentControlSet\Services\bam\state\UserSettings\")
+
+# Raccogliere gli SID degli utenti
+$Users = @()
+foreach ($path in $bamPaths) {
+    Try {
+        $currentUsers = Get-ChildItem -Path $path -ErrorAction Stop | Select-Object -ExpandProperty PSChildName
+        $Users += $currentUsers
+    }
+    Catch {
+        Write-Warning "Error accessing path $path: $_"
     }
 }
-Catch {
-    Write-Warning "Error Parsing BAM Key. Likely unsupported Windows Version"
-    Exit
-}
 
-$rpath = @("HKLM:\SYSTEM\CurrentControlSet\Services\bam\","HKLM:\SYSTEM\CurrentControlSet\Services\bam\state\")
+# Rimuovere duplicati
+$Users = $Users | Select-Object -Unique
 
-$UserTime = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation").TimeZoneKeyName
-$UserBias = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation").ActiveTimeBias
-$UserDay = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation").DaylightBias
+# Informazioni sul fuso orario
+$timeZoneInfo = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation"
+$UserTimeZone = $timeZoneInfo.TimeZoneKeyName
+$UserBias = $timeZoneInfo.ActiveTimeBias
+$UserDaylightBias = $timeZoneInfo.DaylightBias
 
-$Bam = Foreach ($Sid in $Users) {
-    foreach($rp in $rpath) {
-        $BamItems = Get-Item -Path "$($rp)UserSettings\$Sid" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Property
-        Write-Host -ForegroundColor Red "Extracting " -NoNewLine
-        Write-Host -ForegroundColor Blue "$($rp)UserSettings\$SID"
-        foreach ($Item in $BamItems) {
-            $Key = Get-ItemProperty -Path "$($rp)UserSettings\$Sid" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty $Item
+# Inizializzare l'array dei risultati
+$results = @()
 
-            if ($Key.length -eq 24) {
-                $Hex = [System.BitConverter]::ToString($Key[7..0]) -replace "-",""
-                $TimeLocal = Get-Date ([DateTime]::FromFileTime([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
-                $TimeUTC = Get-Date ([DateTime]::FromFileTimeUtc([Convert]::ToInt64($Hex, 16))) -Format "yyyy-MM-dd HH:mm:ss"
-                Write-Host -NoNewLine "$($Item) : $($Key) => "
-                Write-Host -ForegroundColor Green "[$($TimeLocal)] (Local)"
-                Write-Host -ForegroundColor Yellow "[$($TimeUTC)] (UTC)"
+# Elaborare ogni SID
+foreach ($Sid in $Users) {
+    foreach ($rp in $bamPaths) {
+        $userSettingsPath = "$rp$Sid"
+        Try {
+            $properties = Get-ItemProperty -Path $userSettingsPath -ErrorAction Stop | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name
+        }
+        Catch {
+            Write-Warning "Error accessing $userSettingsPath: $_"
+            continue
+        }
+
+        # Tradurre SID in nome utente
+        Try {
+            $objSID = New-Object System.Security.Principal.SecurityIdentifier($Sid)
+            $User = $objSID.Translate([System.Security.Principal.NTAccount]).Value
+        }
+        Catch {
+            $User = "Unknown"
+        }
+
+        foreach ($Item in $properties) {
+            Try {
+                $KeyValue = (Get-ItemProperty -Path $userSettingsPath -Name $Item -ErrorAction Stop).$Item
+            }
+            Catch {
+                Write-Warning "Error getting property $Item from $userSettingsPath: $_"
+                continue
+            }
+
+            if ($KeyValue.Length -eq 24) {
+                # Estrarre il timestamp dal valore della chiave
+                try {
+                    $Hex = [System.BitConverter]::ToString($KeyValue[7..0]) -replace "-", ""
+                    $FileTime = [Convert]::ToInt64($Hex, 16)
+                    $TimeLocal = [DateTime]::FromFileTime($FileTime).ToString("yyyy-MM-dd HH:mm:ss")
+                    $TimeUTC = [DateTime]::FromFileTimeUtc($FileTime).ToString("yyyy-MM-dd HH:mm:ss")
+                    $TimeUser = [DateTime]::FromFileTimeUtc($FileTime).AddMinutes($UserBias).ToString("yyyy-MM-dd HH:mm:ss")
+                    
+                    # Processare $Item come percorso file, se possibile
+                    # Supponiamo che $Item contenga un percorso file in formato \Device\HarddiskVolumeX\path\file.exe
+                    $path = ""
+                    if ($Item -match "^\\Device\\HarddiskVolume\d+\\(.+)") {
+                        $relativePath = $matches[1]
+                        # Trovare la lettera dell'unità corrispondente a HarddiskVolumeX
+                        $drives = Get-WmiObject Win32_LogicalDisk | Select-Object DeviceID, VolumeName, FileSystem
+                        # Mappare HarddiskVolumeX a lettere di unità
+                        # Nota: Questa mappatura può essere complessa; semplifichiamo tentando di trovare il percorso
+                        foreach ($drive in $drives) {
+                            $testPath = Join-Path -Path $drive.DeviceID -ChildPath $relativePath
+                            if (Test-Path $testPath) {
+                                $path = $testPath
+                                break
+                            }
+                        }
+                    }
+
+                    # Ottenere la lettera del drive
+                    $driveLetter = if ($path -ne "") { (Split-Path -Path $path -Qualifier) } else { "N/A" }
+
+                    # Ottenere la firma del file
+                    $signature = if ($path -ne "") { Get-Signature -FilePath $path } else { "N/A" }
+
+                    # Ottenere il tipo di file system
+                    $fileSystem = if ($driveLetter -ne "N/A") { Get-FileSystemType -DriveLetter $driveLetter } else { "N/A" }
+
+                    # Verificare se il drive esiste
+                    $driveExists = if ($driveLetter -ne "N/A") { Check-DriveExists -DriveLetter $driveLetter } else { "N/A" }
+
+                    # Verificare lo stato di eliminazione del file
+                    $fileDeletionStatus = if ($path -ne "") { Check-FileDeletion -FilePath $path } else { "N/A" }
+
+                    # Raccogliere i dati
+                    $result = [PSCustomObject]@{
+                        'User' = $User
+                        'SID' = $Sid
+                        'RegistryPath' = $userSettingsPath
+                        'Property' = $Item
+                        'Timestamp (Local)' = $TimeLocal
+                        'Timestamp (UTC)' = $TimeUTC
+                        'Timestamp (User)' = $TimeUser
+                        'Path' = $path
+                        'Signature' = $signature
+                        'Drive Letter' = $driveLetter
+                        'File System' = $fileSystem
+                        'Drive Status' = $driveExists
+                        'File Deletion Status' = $fileDeletionStatus
+                    }
+
+                    $results += $result
+                }
+                catch {
+                    Write-Warning "Error processing $Item: $_"
+                }
             }
         }
     }
 }
 
-$sw.Stop()
+# Output dei risultati
+if ($results.Count -gt 0) {
+    $results | Out-GridView -Title "BAM Key Entries ($($results.Count)) - User TimeZone: $UserTimeZone | ActiveBias: $UserBias | DaylightBias: $UserDaylightBias"
+}
+else {
+    Write-Host "No BAM entries found." -ForegroundColor Yellow
+}
 
-Write-Host "Elapsed Time: $($sw.Elapsed.TotalSeconds) Seconds"
+# Fermare il timer
+$sw.Stop()
+$elapsed = $sw.Elapsed.TotalSeconds
+Write-Host "Elapsed Time: $elapsed Seconds" -ForegroundColor Yellow
+
+# Assicurarsi che il servizio BAM sia in esecuzione
+Ensure-BAMService
