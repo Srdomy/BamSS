@@ -98,8 +98,31 @@ function Ensure-BAMService {
 # Pulizia della console
 Clear-Host
 
-# Logo migliorato su una sola linea
-$logo = "██████╗░██╗░░░██╗███╗░░░███╗██████╗░██╔══██╗██║░░░██║████╗░████║██╔══██╗██║░░██║██║░░░██║██╔████╔██║██████╦╝██║░░██║██║░░░██║██║╚██╔╝██║██╔══██╗██████╔╝╚██████╔╝██║░╚═╝░██║██████╦╝╚═════╝░░╚═════╝░╚═╝░░░░░╚═╝╚═════╝░░██████╗░██████╗██╔════╝██╔════╝╚█████╗░╚█████╗░░╚═══██╗░╚═══██╗██████╔╝██████╔╝╚═════╝░╚═════╝░██████╗░░█████╗░███╗░░░███╗██╔══██╗██╔══██╗████╗░████║██████╦╝███████║██╔████╔██║██╔══██╗██╔══██║██║╚██╔╝██║██████╦╝██║░░██║██║░╚═╝░██║╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝ Made by Srdomy"
+# Logo migliorato
+$logo = @"
+██████╗░██╗░░░██╗███╗░░░███╗██████╗░
+██╔══██╗██║░░░██║████╗░████║██╔══██╗
+██║░░██║██║░░░██║██╔████╔██║██████╦╝
+██║░░██║██║░░░██║██║╚██╔╝██║██╔══██╗
+██████╔╝╚██████╔╝██║░╚═╝░██║██████╦╝
+╚═════╝░░╚═════╝░╚═╝░░░░░╚═╝╚═════╝░
+
+░██████╗░██████╗
+██╔════╝██╔════╝
+╚█████╗░╚█████╗░
+░╚═══██╗░╚═══██╗
+██████╔╝██████╔╝
+╚═════╝░╚═════╝░
+
+██████╗░░█████╗░███╗░░░███╗
+██╔══██╗██╔══██╗████╗░████║
+██████╦╝███████║██╔████╔██║
+██╔══██╗██╔══██║██║╚██╔╝██║
+██████╦╝██║░░██║██║░╚═╝░██║
+╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝
+
+Made by Srdomy
+"@
 
 Write-Host $logo -ForegroundColor Red
 Write-Host ""
@@ -125,7 +148,7 @@ if (!(Get-PSDrive -Name HKLM -PSProvider Registry -ErrorAction SilentlyContinue)
         New-PSDrive -Name HKLM -PSProvider Registry -Root HKEY_LOCAL_MACHINE -ErrorAction Stop
     }
     Catch {
-        Write-Warning "Error Mounting HKEY_LOCAL_MACHINE: $_"
+        Write-Warning "Error Mounting HKEY_LOCAL_MACHINE: $($_)"
         Exit
     }
 }
@@ -141,7 +164,7 @@ foreach ($path in $bamPaths) {
         $Users += $currentUsers
     }
     Catch {
-        Write-Warning "Error accessing path $path: $_"
+        Write-Warning "Error accessing path $path: $($_)"
     }
 }
 
@@ -165,7 +188,7 @@ foreach ($Sid in $Users) {
             $properties = Get-ItemProperty -Path $userSettingsPath -ErrorAction Stop | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name
         }
         Catch {
-            Write-Warning "Error accessing $userSettingsPath: $_"
+            Write-Warning "Error accessing $userSettingsPath: $($_)"
             continue
         }
 
@@ -183,7 +206,7 @@ foreach ($Sid in $Users) {
                 $KeyValue = (Get-ItemProperty -Path $userSettingsPath -Name $Item -ErrorAction Stop).$Item
             }
             Catch {
-                Write-Warning "Error getting property $Item from $userSettingsPath: $_"
+                Write-Warning "Error getting property $Item from $userSettingsPath: $($_)"
                 continue
             }
 
@@ -199,75 +222,37 @@ foreach ($Sid in $Users) {
                     # Processare $Item come percorso file, se possibile
                     # Supponiamo che $Item contenga un percorso file in formato \Device\HarddiskVolumeX\path\file.exe
                     $path = ""
-                    if ($Item -match "^\\Device\\HarddiskVolume\d+\\(.+)") {
-                        $relativePath = $matches[1]
-                        # Trovare la lettera dell'unità corrispondente a HarddiskVolumeX
-                        $drives = Get-WmiObject Win32_LogicalDisk | Select-Object DeviceID, VolumeName, FileSystem
-                        # Mappare HarddiskVolumeX a lettere di unità
-                        # Nota: Questa mappatura può essere complessa; semplifichiamo tentando di trovare il percorso
-                        foreach ($drive in $drives) {
-                            $testPath = Join-Path -Path $drive.DeviceID -ChildPath $relativePath
-                            if (Test-Path $testPath) {
-                                $path = $testPath
-                                break
-                            }
+                    if ($Item -match "^\\Device\\HarddiskVolume([0-9]+)\\(.+)$") {
+                        $volNum = $matches[1]
+                        $relativePath = $matches[2]
+                        $driveLetter = (Get-WmiObject -Query "SELECT * FROM Win32_LogicalDisk WHERE VolumeName LIKE 'HarddiskVolume$volNum%'").DeviceID
+                        if ($driveLetter) {
+                            $path = "$driveLetter\$relativePath"
                         }
                     }
 
-                    # Ottenere la lettera del drive
-                    $driveLetter = if ($path -ne "") { (Split-Path -Path $path -Qualifier) } else { "N/A" }
-
-                    # Ottenere la firma del file
-                    $signature = if ($path -ne "") { Get-Signature -FilePath $path } else { "N/A" }
-
-                    # Ottenere il tipo di file system
-                    $fileSystem = if ($driveLetter -ne "N/A") { Get-FileSystemType -DriveLetter $driveLetter } else { "N/A" }
-
-                    # Verificare se il drive esiste
-                    $driveExists = if ($driveLetter -ne "N/A") { Check-DriveExists -DriveLetter $driveLetter } else { "N/A" }
-
-                    # Verificare lo stato di eliminazione del file
-                    $fileDeletionStatus = if ($path -ne "") { Check-FileDeletion -FilePath $path } else { "N/A" }
-
-                    # Raccogliere i dati
-                    $result = [PSCustomObject]@{
-                        'User' = $User
-                        'SID' = $Sid
-                        'RegistryPath' = $userSettingsPath
-                        'Property' = $Item
-                        'Timestamp (Local)' = $TimeLocal
-                        'Timestamp (UTC)' = $TimeUTC
-                        'Timestamp (User)' = $TimeUser
-                        'Path' = $path
-                        'Signature' = $signature
-                        'Drive Letter' = $driveLetter
-                        'File System' = $fileSystem
-                        'Drive Status' = $driveExists
-                        'File Deletion Status' = $fileDeletionStatus
+                    # Inserire i dati nell'array dei risultati
+                    $results += [pscustomobject]@{
+                        User = $User
+                        SID = $Sid
+                        Path = $Item
+                        TimeUTC = $TimeUTC
+                        TimeLocal = $TimeLocal
+                        TimeUser = $TimeUser
                     }
-
-                    $results += $result
                 }
                 catch {
-                    Write-Warning "Error processing $Item: $_"
+                    Write-Warning "Error processing $Item: $($_)"
                 }
             }
         }
     }
 }
 
-# Output dei risultati
-if ($results.Count -gt 0) {
-    $results | Out-GridView -Title "BAM Key Entries ($($results.Count)) - User TimeZone: $UserTimeZone | ActiveBias: $UserBias | DaylightBias: $UserDaylightBias"
-}
-else {
-    Write-Host "No BAM entries found." -ForegroundColor Yellow
-}
-
-# Fermare il timer
+# Arrestare il timer
 $sw.Stop()
-$elapsed = $sw.Elapsed.TotalSeconds
-Write-Host "Elapsed Time: $elapsed Seconds" -ForegroundColor Yellow
 
-# Assicurarsi che il servizio BAM sia in esecuzione
-Ensure-BAMService
+# Mostrare i risultati
+$results | Format-Table -AutoSize
+
+Write-Host "Completed in $($sw.Elapsed.TotalSeconds) seconds." -ForegroundColor Green
