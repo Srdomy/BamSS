@@ -50,27 +50,55 @@ function Get-FileSystemType {
     return $fsType
 }
 
-function Get-FileDeletionInfo {
+function Get-DriveName {
     param (
         [string]$FilePath
     )
-    # Simulate logic to retrieve deletion info
-    # Placeholder for actual logic to determine if the file was deleted, 
-    # with shift-delete or moved to recycle bin
-    $deletionInfo = "File deletion information not available."
-    return $deletionInfo
+
+    $driveLetter = $FilePath.Substring(0, 1)
+    return "DISK $driveLetter"
+}
+
+function Is-SuspiciousFile {
+    param (
+        [string]$FilePath,
+        [string]$Signature
+    )
+
+    # If the signature is invalid
+    if ($Signature -match "Invalid" -or $Signature -match "Unknown") {
+        return $true
+    }
+
+    # Check if Windows Defender flags the file as a virus
+    $virusStatus = Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.Resources -match $FilePath }
+    if ($virusStatus) {
+        return $true
+    }
+
+    # Check if the file is executable from the command line
+    try {
+        $executionResult = Start-Process -FilePath $FilePath -NoNewWindow -Wait -PassThru -ErrorAction SilentlyContinue
+        if ($executionResult.ExitCode -ne 0) {
+            return $true
+        }
+    } catch {
+        return $true
+    }
+
+    return $false
 }
 
 Clear-Host
 
 Write-Host ""
 Write-Host ""
-Write-Host -ForegroundColor Red "   ██████╗ ███████╗██████╗     ██╗      ██████╗ ████████╗██╗   ██╗███████╗    ██████╗  █████╗ ███╗   ███╗";
-Write-Host -ForegroundColor Red "   ██╔══██╗██╔════╝██╔══██╗    ██║     ██╔═══██╗╚══██╔══╝██║   ██║██╔════╝    ██╔══██╗██╔══██╗████╗ ████║";
-Write-Host -ForegroundColor Red "   ██████╔╝█████╗  ██║  ██║    ██║     ██║   ██║   ██║   ██║   ██║███████╗    ██████╔╝███████║██╔████╔██║";
-Write-Host -ForegroundColor Red "   ██╔══██╗██╔══╝  ██║  ██║    ██║     ██║   ██║   ██║   ██║   ██║╚════██║    ██╔══██╗██╔══██║██║╚██╔╝██║";
-Write-Host -ForegroundColor Red "   ██║  ██║███████╗██████╔╝    ███████╗╚██████╔╝   ██║   ╚██████╔╝███████║    ██████╔╝██║  ██║██║ ╚═╝ ██║";
-Write-Host -ForegroundColor Red "   ╚═╝  ╚═╝╚══════╝╚═════╝     ╚══════╝ ╚═════╝    ╚═╝    ╚═════╝ ╚══════╝    ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝";
+Write-Host -ForegroundColor Red "   ██████╗ ███████╗██████╗     ██╗      ██████╗ ████████╗██╗   ██╗███████╗    ██████╗  █████╗ ███╗   ███╗"
+Write-Host -ForegroundColor Red "   ██╔══██╗██╔════╝██╔══██╗    ██║     ██╔═══██╗╚══██╔══╝██║   ██║██╔════╝    ██╔══██╗██╔══██╗████╗ ████║"
+Write-Host -ForegroundColor Red "   ██████╔╝█████╗  ██║  ██║    ██║     ██║   ██║   ██║   ██║   ██║███████╗    ██████╔╝███████║██╔████╔██║"
+Write-Host -ForegroundColor Red "   ██╔══██╗██╔══╝  ██║  ██║    ██║     ██║   ██║   ██║   ██║   ██║╚════██║    ██╔══██╗██╔══██║██║╚██╔╝██║"
+Write-Host -ForegroundColor Red "   ██║  ██║███████╗██████╔╝    ███████╗╚██████╔╝   ██║   ╚██████╔╝███████║    ██████╔╝██║  ██║██║ ╚═╝ ██║"
+Write-Host -ForegroundColor Red "   ╚═╝  ╚═╝╚══════╝╚═════╝     ╚══════╝ ╚═════╝    ╚═╝    ╚═════╝ ╚══════╝    ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝"
 Write-Host ""
 Write-Host -ForegroundColor Blue "   Made By PureIntent (Shitty ScreenSharer) For Red Lotus ScreenSharing and DFIR - " -NoNewLine
 Write-Host -ForegroundColor Red "discord.gg/redlotus"
@@ -128,25 +156,17 @@ $Bam = Foreach ($Sid in $Users){$u++
                 $d = if((((split-path -path $item) | ConvertFrom-String -Delimiter "\\").P3)-match '\d{1}')
                 {((split-path -path $item).Remove(23)).trimstart("\Device\HarddiskVolume")} else {$d = ""}
                 $f = if((((split-path -path $item) | ConvertFrom-String -Delimiter "\\").P3)-match '\d{1}')
-                {Split-path -leaf ($item).TrimStart()} else {$item}
+                {Split-path -leaf ($item).TrimStart()} else {$item}    
                 $cp = if((((split-path -path $item) | ConvertFrom-String -Delimiter "\\").P3)-match '\d{1}')
                 {($item).Remove(1,23)} else {$cp = ""}
                 $path = if((((split-path -path $item) | ConvertFrom-String -Delimiter "\\").P3)-match '\d{1}')
                 {Join-Path -Path "C:" -ChildPath $cp} else {$path = ""}
-                
-                # Get the file system type
+
+                $sig = Get-Signature -FilePath $path
                 $fsType = Get-FileSystemType -FilePath $path
+                $driveName = Get-DriveName -FilePath $path
+                $isSuspicious = Is-SuspiciousFile -FilePath $path -Signature $sig
 
-                # Get deletion info (if applicable)
-                $deletionInfo = Get-FileDeletionInfo -FilePath $path
-
-                $sig = if((((split-path -path $item) | ConvertFrom-String -Delimiter "\\").P3)-match '\d{1}')
-                {Get-Signature -FilePath $path} else {$sig = ""}
-
-                # Mark suspicious files with invalid or unknown signature
-                $foreground = if ($sig -match "Invalid" -or $sig -match "Unknown") { "Red" } else { "White" }
-
-                Write-Host ("Suspicious" + ": $f") -ForegroundColor $foreground
                 [PSCustomObject]@{
                     'Examiner Time' = $TimeLocal
                     'Last Execution Time (UTC)'= $TimeUTC
@@ -155,7 +175,8 @@ $Bam = Foreach ($Sid in $Users){$u++
                     Path = $path
                     Signature = $sig
                     'File System' = $fsType
-                    'Deletion Info' = $deletionInfo
+                    'Drive' = $driveName
+                    'Suspicious File' = if ($isSuspicious) { "Yes" } else { "No" }
                     User = $User
                     SID = $Sid
                     Regpath = $rp
