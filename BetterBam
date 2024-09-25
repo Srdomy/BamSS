@@ -29,16 +29,46 @@ function Get-Signature {
     }
 }
 
+# Function to get disk information
+function Get-DiskInfo {
+    param (
+        [string]$FilePath
+    )
+    
+    $driveLetter = [System.IO.Path]::GetPathRoot($FilePath)
+    $disk = Get-Volume -DriveLetter $driveLetter.TrimEnd(':')
+    return [PSCustomObject]@{
+        DriveLetter = $driveLetter
+        FileSystem = $disk.FileSystem
+    }
+}
+
+# Function to determine if a file is suspicious
+function Is-Suspicious {
+    param (
+        [string]$FilePath,
+        [string]$SignatureStatus
+    )
+    
+    # Simple example: you might check against a list of known malware or use some heuristic
+    if ($SignatureStatus -match "Invalid Signature") {
+        return $true
+    }
+    
+    # Further checks could be added here (e.g., using antivirus scanning)
+    return $false
+}
+
 # Logo Display
 Clear-Host
-Write-Host -ForegroundColor Red "██████╗ ███████╗████████╗████████╗███████╗██████╗ ██████╗  █████╗ ███╗   ███╗"
-Write-Host -ForegroundColor Red "██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗██╔══██╗██╔══██╗████╗ ████║"
-Write-Host -ForegroundColor Red "██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝██████╔╝███████║██╔████╔██║"
-Write-Host -ForegroundColor Red "██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗██╔══██╗██╔══██║██║╚██╔╝██║"
-Write-Host -ForegroundColor Red "██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║██████╔╝██║  ██║██║ ╚═╝ ██║"
-Write-Host -ForegroundColor Red "╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝"
-Write-Host -ForegroundColor Blue "   Made By Srdomy  "
-Write-Host -ForegroundColor Red "TG: withoutusername"
+Write-Host -ForegroundColor Red "   ██████╗ ███████╗████████╗████████╗███████╗██████╗ ██████╗  █████╗ ███╗   ███╗"
+Write-Host -ForegroundColor Red "   ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗██╔══██╗██╔══██╗████╗ ████║"
+Write-Host -ForegroundColor Red "   ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝██████╔╝███████║██╔████╔██║"
+Write-Host -ForegroundColor Red "   ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗██╔══██╗██╔══██║██║╚██╔╝██║"
+Write-Host -ForegroundColor Red "   ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║██████╔╝██║  ██║██║ ╚═╝ ██║"
+Write-Host -ForegroundColor Red "   ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝"
+Write-Host -ForegroundColor Blue " Made By Srdomy
+Write-Host -ForegroundColor Red "  TG: withoutsurname"
 Write-Host ""
 
 function Test-Admin {
@@ -140,23 +170,24 @@ $Bam = foreach ($Sid in $Users) {
                     'Examiner Time' = $TimeLocal
                     'Last Execution Time (UTC)' = $TimeUTC
                     'Last Execution User Time' = $TimeUser
-                    'Application' = $f
-                    'Path' = $path
-                    'Disk' = $diskInfo.DriveLetter
-                    'FileSystem' = $diskInfo.FileSystem
-                    'Signature' = $sig
-                    'Suspicious' = $isSuspicious
-                    'User' = $User
-                    'SID' = $Sid
-                    'Regpath' = $rp
+                    Application = $f
+                    Path = $path
+                    Signature = $sig
+                    User = $User
+                    SID = $Sid
+                    Regpath = $rp
+                    DriveLetter = $diskInfo.DriveLetter
+                    FileSystem = $diskInfo.FileSystem
+                    IsSuspicious = if ($isSuspicious) { "Yes" } else { "No" }
                 }
             }
         }
     }
 }
 
-$sw.Stop()
-$Bam | Out-GridView -PassThru -Title "BAM key entries $($Bam.count) - Disk Info and Suspicious Files"
+$Bam | Out-GridView -PassThru -Title "BAM key entries $($Bam.count) - User TimeZone: ($UserTime) -> ActiveBias: ( $Bias) - DayLightTime: ($Day)"
 
-# Final Output
-Write-Host "Total Time Taken: $($sw.Elapsed.TotalSeconds) seconds"
+$sw.stop()
+$t = $sw.Elapsed.TotalMinutes
+Write-Host ""
+Write-Host "Elapsed Time $t Minutes" -ForegroundColor Yellow
